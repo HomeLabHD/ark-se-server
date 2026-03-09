@@ -4,8 +4,8 @@
 |-------|-------------|
 | [Install](Install.md) | Docker, Docker Compose & Kubernetes setup |
 | [Configuration](Configuration.md) | Environment variables & volume mounts |
-| [Health Server](HealthServer.md) | Optional RCON health endpoint |
 | [Clustering](Clustering.md) | Multi-map cluster with shared transfers |
+| [Health Server](HealthServer.md) | Optional RCON health endpoint |
 
 ## Templates
 

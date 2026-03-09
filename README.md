@@ -18,7 +18,7 @@ ARK: Survival Evolved dedicated server image, for single instances and clusters.
 | Tag | Description |
 |-----|-------------|
 | [`latest`](https://hub.docker.com/layers/drpsychick/arkserver/latest/images/sha256-59e6f0d445fa00b26111346854b561d6b1f9b1853e34808a9f1ebffdf32cc703) | most recent build from the master branch |
-| [`x.x.x`](https://hub.docker.com/layers/drpsychick/arkserver/latest-v1.6.62/images/sha256-82d8b119c03f04033e399b33cd6a997ab61b88d5e692caf6339349f7ff4495b3) | release builds |
+| [`latest-v1.6.62`](https://hub.docker.com/layers/drpsychick/arkserver/latest-v1.6.62/images/sha256-82d8b119c03f04033e399b33cd6a997ab61b88d5e692caf6339349f7ff4495b3) | release builds |
 
 ### Documentation
 

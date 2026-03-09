@@ -37,10 +37,13 @@ For more information on `arkmanager`, see the repo here: [arkmanager/ark-server-
 * Optional [RCON health server](docs/HealthServer.md) for application-level readiness checks
 
 ### Tags
-| Tag            | Description                              |
-|----------------|------------------------------------------|
-| latest         | most recent build from the master branch |
-| x.x.x (semver) | release builds                           |
+| Tag               | Description                                        |
+|-------------------|----------------------------------------------------|
+| latest            | most recent build from the master branch            |
+| latest-v1.6.x     | pinned to a specific arkmanager version             |
+| latest-master     | built from the latest arkmanager master branch      |
+| jammy             | Ubuntu 22.04 (Jammy) base                           |
+| focal             | Ubuntu 20.04 (Focal) base                           |
 
 ### Documentation
 

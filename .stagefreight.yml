@@ -24,6 +24,31 @@ builds:
     platforms: [linux/amd64]
 
 targets:
+  # ── Docker Hub: stable releases ─────────────────────────────────
+  - id: dockerhub-stable
+    kind: registry
+    build: arkserver
+    url: docker.io
+    provider: docker
+    path: "{var:org}/{var:repo}"
+    tags:
+      - "v{version}"
+      - "latest"
+    when: { git_tags: [stable], events: [tag] }
+    credentials: DOCKER
+
+  # ── Docker Hub: pre-releases ────────────────────────────────────
+  - id: dockerhub-prerelease
+    kind: registry
+    build: arkserver
+    url: docker.io
+    provider: docker
+    path: "{var:org}/{var:repo}"
+    tags:
+      - "v{version}"
+    when: { git_tags: [prerelease], events: [tag] }
+    credentials: DOCKER
+
   # ── Docker Hub: dev builds on every commit ──────────────────────
   - id: dockerhub-dev
     kind: registry
@@ -40,15 +65,51 @@ targets:
       keep_last: 6
       protect: ["latest-dev"]
 
-  # ── Docker Hub: stable releases ─────────────────────────────────
-  - id: dockerhub-stable
-    kind: registry
-    build: arkserver
+  # ── Docker Hub: README sync ─────────────────────────────────────
+  - id: dockerhub-readme
+    kind: docker-readme
     url: docker.io
-    provider: docker
     path: "{var:org}/{var:repo}"
-    tags:
-      - "v{version}"
-      - "latest"
-    when: { git_tags: [stable], events: [tag] }
     credentials: DOCKER
+    when: { branches: [main], events: [push, tag] }
+    file: "README.md"
+    description: "ARK: Survival Evolved dedicated server with optional RCON health endpoint"
+    link_base: "https://gitlab.prplanit.com/sofmeright/{var:repo}/blob/main"
+
+  # ── Primary release ─────────────────────────────────────────────
+  - id: primary-release
+    kind: release
+    aliases: ["v{version}", "latest"]
+    when: { git_tags: [stable], events: [tag] }
+
+lint:
+  level: full
+  modules:
+    freshness:
+      enabled: true
+      options:
+        cache_ttl: 300
+        sources:
+          docker_images: true
+          docker_tools: true
+        vulnerability:
+          enabled: true
+    tabs:
+      enabled: true
+    secrets:
+      enabled: true
+    conflicts:
+      enabled: true
+    filesize:
+      enabled: true
+    unicode:
+      enabled: true
+      options:
+        detect_bidi: true
+        detect_zero_width: true
+        detect_control_ascii: true
+
+security:
+  enabled: true
+  sbom: true
+  release_detail: full

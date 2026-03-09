@@ -24,6 +24,7 @@ ARK: Survival Evolved dedicated server image, for single instances and clusters.
 
 |                     |                                                     |
 | ------------------- | --------------------------------------------------- |
+| Install             | [Docker, Compose & Kubernetes](docs/Install.md)     |
 | Configuration       | [Environment Variables & Volumes](docs/Configuration.md) |
 | arkmanager          | [arkmanager/ark-server-tools](https://github.com/arkmanager/ark-server-tools) |
 | Health Server       | [RCON Health Endpoint](docs/HealthServer.md)        |
@@ -31,23 +32,17 @@ ARK: Survival Evolved dedicated server image, for single instances and clusters.
 
 ## Quick Start
 
-Pull the latest (or any other desired version):
 ```bash
-docker pull drpsychick/arkserver:latest
-```
-
-To run a generic server with no configuration modifications:
-```bash
-$ docker run -d \
-    -v steam:/home/steam/.steam/steamapps \  # mounted so that workshop (mod) downloads are persisted
-    -v ark:/ark \  # mounted as the directory to contain the server/backup/log/config files
-    -p 27015:27015 -p 27015:27015/udp \  # steam query port
-    -p 7778:7778 -p 7778:7778/udp \  # gameserver port
-    -p 7777:7777 -p 7777:7777/udp \ # gameserver port
+docker run -d \
+    -v steam:/home/steam/.steam/steamapps \
+    -v ark:/ark \
+    -p 27015:27015 -p 27015:27015/udp \
+    -p 7778:7778 -p 7778:7778/udp \
+    -p 7777:7777 -p 7777:7777/udp \
     drpsychick/arkserver
 ```
 
-If the exposed ports are modified (in the case of multiple containers/servers on the same host) the `arkmanager` config will need to be modified to reflect the change as well. This is required so that `arkmanager` can properly check the server status and so that the ARK server itself can properly publish its IP address and query port to steam.
+See [Install](docs/Install.md) for Docker Compose and Kubernetes examples.
 
 ## Credits
 

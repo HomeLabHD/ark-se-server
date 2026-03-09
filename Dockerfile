@@ -37,6 +37,7 @@ COPY arkmanager/arkmanager.cfg /etc/arkmanager/arkmanager.cfg
 COPY arkmanager/instance.cfg /etc/arkmanager/instances/main.cfg
 COPY run.sh /home/steam/run.sh
 COPY log.sh /home/steam/log.sh
+COPY health-server.py /home/steam/health-server.py
 
 RUN echo "%sudo   ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers \
     && usermod -a -G sudo steam \
@@ -60,7 +61,9 @@ ENV am_ark_SessionName=Ark\ Server \
 ENV VALIDATE_SAVE_EXISTS=false \
     BACKUP_ONSTART=false \
     LOG_RCONCHAT=0 \
-    ARKCLUSTER=false
+    ARKCLUSTER=false \
+    HEALTH_SERVER=false \
+    HEALTH_SERVER_PORT=8080
 
 # only mount the steamapps directory
 # mount /home/steam/.steam/steamapps if you want to share storage for steam mod staging
@@ -69,5 +72,7 @@ VOLUME /ark
 VOLUME /arkserver
 # mount /arkserver/ShooterGame/Saved seperate for each server
 # mount /arkserver/ShooterGame/Saved/clusters shared for all servers
+
+EXPOSE 8080
 
 CMD [ "./run.sh" ]

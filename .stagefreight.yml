@@ -1,0 +1,54 @@
+version: 1
+
+vars:
+  org: sofmeright
+  repo: ark-se-oci
+
+sources:
+  primary:
+    kind: git
+    worktree: "."
+    url: "https://gitlab.prplanit.com/sofmeright/{var:repo}"
+    default_branch: "main"
+
+policies:
+  git_tags:
+    stable: "^v?\\d+\\.\\d+\\.\\d+$"
+    prerelease: "^v?\\d+\\.\\d+\\.\\d+-.+"
+  branches:
+    main: "^main$"
+
+builds:
+  - id: arkserver
+    kind: docker
+    platforms: [linux/amd64]
+
+targets:
+  # ── Docker Hub: dev builds on every commit ──────────────────────
+  - id: dockerhub-dev
+    kind: registry
+    build: arkserver
+    url: docker.io
+    provider: docker
+    path: "{var:org}/{var:repo}"
+    tags:
+      - "dev-{sha:8}"
+      - "latest-dev"
+    when: { branches: [main], events: [push] }
+    credentials: DOCKER
+    retention:
+      keep_last: 6
+      protect: ["latest-dev"]
+
+  # ── Docker Hub: stable releases ─────────────────────────────────
+  - id: dockerhub-stable
+    kind: registry
+    build: arkserver
+    url: docker.io
+    provider: docker
+    path: "{var:org}/{var:repo}"
+    tags:
+      - "v{version}"
+      - "latest"
+    when: { git_tags: [stable], events: [tag] }
+    credentials: DOCKER

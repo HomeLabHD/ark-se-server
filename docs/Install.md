@@ -21,7 +21,7 @@ If the exposed ports are modified (in the case of multiple containers/servers on
 
 ## Docker Compose
 
-A ready-to-use [docker-compose.yml](docker-compose.yml) is included:
+A ready-to-use [docker-compose.yml](docker/docker-compose.yml) is included:
 
 ```bash
 docker compose up -d
@@ -51,129 +51,14 @@ A StatefulSet is recommended over a Deployment — ARK servers are stateful and 
 
 ### Single Instance
 
-```yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: arkserver
-spec:
-  serviceName: arkserver
-  replicas: 1
-  selector:
-    matchLabels:
-      app: arkserver
-  template:
-    metadata:
-      labels:
-        app: arkserver
-    spec:
-      securityContext:
-        fsGroup: 1001
-      containers:
-        - name: arkserver
-          image: drpsychick/arkserver:latest
-          ports:
-            - containerPort: 27015
-              protocol: UDP
-              name: query
-            - containerPort: 7778
-              protocol: UDP
-              name: game
-            - containerPort: 7778
-              protocol: TCP
-              name: game-tcp
-            - containerPort: 32330
-              protocol: TCP
-              name: rcon
-            - containerPort: 8080
-              protocol: TCP
-              name: health
-          env:
-            - name: am_ark_SessionName
-              value: "My ARK Server"
-            - name: am_serverMap
-              value: TheIsland
-            - name: am_ark_ServerAdminPassword
-              valueFrom:
-                secretKeyRef:
-                  name: ark-secrets
-                  key: admin-password
-            - name: am_ark_MaxPlayers
-              value: "20"
-            - name: am_arkAutoUpdateOnStart
-              value: "true"
-            - name: HEALTH_SERVER
-              value: "true"
-          readinessProbe:
-            httpGet:
-              path: /healthz
-              port: 8080
-            initialDelaySeconds: 120
-            periodSeconds: 30
-            timeoutSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /livez
-              port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          resources:
-            requests:
-              memory: 12Gi
-              cpu: 2000m
-            limits:
-              memory: 16Gi
-          volumeMounts:
-            - name: ark-data
-              mountPath: /ark
-  volumeClaimTemplates:
-    - metadata:
-        name: ark-data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 50Gi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: arkserver
-spec:
-  type: LoadBalancer
-  sessionAffinity: ClientIP
-  sessionAffinityConfig:
-    clientIP:
-      timeoutSeconds: 10800
-  selector:
-    app: arkserver
-  ports:
-    - port: 27015
-      targetPort: 27015
-      protocol: UDP
-      name: query
-    - port: 7778
-      targetPort: 7778
-      protocol: UDP
-      name: game
-    - port: 7778
-      targetPort: 7778
-      protocol: TCP
-      name: game-tcp
-    - port: 32330
-      targetPort: 32330
-      protocol: TCP
-      name: rcon
-    - port: 8080
-      targetPort: 8080
-      protocol: TCP
-      name: health
-```
+A complete single-instance example with health probes, resource limits, and session affinity:
+
+- [k8s/statefulset.yaml](k8s/statefulset.yaml) — StatefulSet with health probes, resource limits, and a 50Gi PVC
+- [k8s/service.yaml](k8s/service.yaml) — LoadBalancer Service with session affinity (3h timeout)
 
 ### Cluster with Shared Server Files
 
-When running multiple maps, use shared PVCs for server binaries and cluster transfer data to avoid duplicating the ~50GB game install per instance:
+When running multiple maps, use shared PVCs for server binaries and cluster transfer data to avoid duplicating the ~50GB game install per instance. Add these env vars and volume mounts to each instance:
 
 ```yaml
           env:
@@ -244,42 +129,7 @@ spec:
 
 #### Network Policy
 
-If your cluster runs default-deny network policies, ARK servers need the following ingress:
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: arkserver-ingress
-spec:
-  podSelector:
-    matchLabels:
-      app: arkserver
-  policyTypes:
-    - Ingress
-  ingress:
-    # Game + Query (UDP from players)
-    - ports:
-        - port: 7778
-          protocol: UDP
-        - port: 27015
-          protocol: UDP
-    # Game (TCP for Epic crossplay)
-    - ports:
-        - port: 7778
-          protocol: TCP
-    # RCON (TCP, restrict to admin sources)
-    - from:
-        - ipBlock:
-            cidr: 10.0.0.0/8     # adjust to your admin CIDR
-      ports:
-        - port: 32330
-          protocol: TCP
-    # Health endpoint (for monitoring/probes)
-    - ports:
-        - port: 8080
-          protocol: TCP
-```
+If your cluster runs default-deny network policies, ARK servers need ingress rules for game/query UDP, crossplay TCP, RCON (restricted to admin CIDRs), and the health endpoint. See [k8s/network-policy.yaml](k8s/network-policy.yaml) for a complete example.
 
 Restrict RCON ingress to trusted admin CIDRs — RCON provides full server console access.
 
@@ -317,154 +167,15 @@ The health server uses this same `arkmanager rconcmd` mechanism under the hood �
 
 ARK supports loading admin lists, whitelists, and ban lists from HTTP URLs instead of local files. This is useful in Kubernetes where multiple server instances need to share the same lists without mounting the same config volume.
 
-The pattern uses an nginx deployment with [njs](https://nginx.org/en/docs/njs/) to serve Steam IDs from a Kubernetes Secret. The same approach works for any list type — cheater IDs, exclusive join lists, ban lists, etc.
+The [k8s/admin-list-server.yaml](k8s/admin-list-server.yaml) deploys an nginx server with [njs](https://nginx.org/en/docs/njs/) that reads Steam IDs from a Kubernetes Secret, deduplicates them, and serves them as plaintext. It includes:
 
-**Secret** — Store Steam IDs in a Secret (or use an External Secrets Operator to sync from Vault):
+- A **Secret** for Steam IDs (or use External Secrets Operator to sync from Vault)
+- **ConfigMaps** for nginx config and the njs script
+- A **Deployment** and **Service** exposing the endpoints
 
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: ark-admin-ids
-stringData:
-  admins.txt: |
-    # One Steam ID per line (hex32 format)
-    # Comments and blank lines are ignored
-    01234567890ABCDEF
-    FEDCBA9876543210
-```
+Available endpoints: `/AllowedCheaterSteamIDs.txt`, `/PlayersJoinNoCheckList.txt`, `/PlayersExclusiveJoinList.txt`
 
-**ConfigMap — nginx config**:
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: ark-admin-list-nginx-conf
-data:
-  nginx.conf: |
-    load_module modules/ngx_http_js_module.so;
-
-    events {}
-    http {
-      js_path /etc/nginx/njs/;
-      js_import main from main.mjs;
-
-      server {
-        listen 8080;
-
-        location /AllowedCheaterSteamIDs.txt {
-          js_content main.serve_ids;
-        }
-        location /PlayersJoinNoCheckList.txt {
-          js_content main.serve_ids;
-        }
-        location /PlayersExclusiveJoinList.txt {
-          js_content main.serve_ids;
-        }
-        location / {
-          return 404;
-        }
-      }
-    }
-```
-
-**ConfigMap — njs script** that reads, deduplicates, and serves Steam IDs:
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: ark-admin-list-njs
-data:
-  main.mjs: |
-    import fs from "fs";
-
-    const DATA_DIR = "/vault-data";
-
-    function loadSteamIds() {
-      let ids = new Set();
-      try {
-        let files = fs.readdirSync(DATA_DIR);
-        for (let f of files) {
-          let content = fs.readFileSync(`${DATA_DIR}/${f}`, "utf8");
-          for (let line of content.split("\n")) {
-            line = line.trim();
-            if (line && !line.startsWith("#") && /^[0-9A-Fa-f]{16,}$/.test(line)) {
-              ids.add(line);
-            }
-          }
-        }
-      } catch (e) {
-        // secret not mounted or empty
-      }
-      return Array.from(ids);
-    }
-
-    function serve_ids(r) {
-      let ids = loadSteamIds();
-      r.headersOut["Content-Type"] = "text/plain";
-      r.return(200, ids.join("\n") + "\n");
-    }
-
-    export default { serve_ids };
-```
-
-**Deployment**:
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ark-admin-list-server
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: ark-admin-list-server
-  template:
-    metadata:
-      labels:
-        app: ark-admin-list-server
-    spec:
-      containers:
-        - name: nginx
-          image: docker.io/nginx:alpine
-          ports:
-            - containerPort: 8080
-          volumeMounts:
-            - name: nginx-conf
-              mountPath: /etc/nginx/nginx.conf
-              subPath: nginx.conf
-            - name: njs
-              mountPath: /etc/nginx/njs/
-            - name: steam-ids
-              mountPath: /vault-data
-              readOnly: true
-      volumes:
-        - name: nginx-conf
-          configMap:
-            name: ark-admin-list-nginx-conf
-        - name: njs
-          configMap:
-            name: ark-admin-list-njs
-        - name: steam-ids
-          secret:
-            secretName: ark-admin-ids
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ark-admin-list-server
-spec:
-  selector:
-    app: ark-admin-list-server
-  ports:
-    - port: 8080
-      targetPort: 8080
-```
-
-Then configure your ARK server to load lists from the service URL:
+Configure your ARK server to load lists from the service URL:
 
 ```bash
 am_arkopt_ExclusiveJoin="http://ark-admin-list-server:8080/PlayersExclusiveJoinList.txt"

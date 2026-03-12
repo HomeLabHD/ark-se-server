@@ -1,3 +1,12 @@
+LABEL maintainer="HomeLabHD <homelabhelp@gmail.com>" \
+    org.opencontainers.image.title="ark-se-server" \
+    org.opencontainers.image.description="ARK: Survival Evolved dedicated server with arkmanager, RCON health endpoint, and cron-based automation." \
+    org.opencontainers.image.source="https://github.com/HomeLabHD/ark-se-server" \
+    org.opencontainers.image.url="https://hub.docker.com/r/hlhd/ark-se-server" \
+    org.opencontainers.image.documentation="https://github.com/HomeLabHD/ark-se-server#readme" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.vendor="HomeLabHD"
+
 ARG STEAMCMD_VERSION=latest
 ARG AMG_BUILD=latest
 # github-releases:arkmanager/ark-server-tools

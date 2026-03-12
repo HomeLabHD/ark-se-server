@@ -1,1 +1,10 @@
+.git
+.gitignore
+.gitlab-ci.yml
+.stagefreight.yml
+.stagefreight/
+.dockerignore
+README.md
+docs/
 test/
+renovate.json

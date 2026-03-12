@@ -39,7 +39,7 @@ if [ -n "$ARKSERVER_SHARED" ]; then
     sudo chown steam:steam $ARKSERVER_SHARED/ShooterGame
   fi
   echo "Shared server files in $ARKSERVER_SHARED..."
-  
+
   # Ensure the Saved directory is mounted properly
   if [ -z "$(mount | grep "on $ARKSERVER_SHARED/ShooterGame/Saved ")" ]; then
     echo "===> ABORT !"
@@ -143,7 +143,7 @@ fi
 	echo "Loading crontab..."
 	# We load the crontab file if it exist.
 	crontab /ark/config/crontab
-	
+
 else
 	echo "No crontab set."
 fi

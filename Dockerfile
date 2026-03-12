@@ -1,3 +1,9 @@
+ARG STEAMCMD_VERSION=latest
+ARG AMG_BUILD=latest
+# github-releases:arkmanager/ark-server-tools
+ARG AMG_VERSION=v1.6.68
+FROM drpsychick/steamcmd:$STEAMCMD_VERSION AS base
+
 LABEL maintainer="HomeLabHD <homelabhelp@gmail.com>" \
     org.opencontainers.image.title="ark-se-server" \
     org.opencontainers.image.description="ARK: Survival Evolved dedicated server with arkmanager, RCON health endpoint, and cron-based automation." \
@@ -6,12 +12,6 @@ LABEL maintainer="HomeLabHD <homelabhelp@gmail.com>" \
     org.opencontainers.image.documentation="https://github.com/HomeLabHD/ark-se-server#readme" \
     org.opencontainers.image.licenses="MIT" \
     org.opencontainers.image.vendor="HomeLabHD"
-
-ARG STEAMCMD_VERSION=latest
-ARG AMG_BUILD=latest
-# github-releases:arkmanager/ark-server-tools
-ARG AMG_VERSION=v1.6.68
-FROM drpsychick/steamcmd:$STEAMCMD_VERSION AS base
 
 USER root
 

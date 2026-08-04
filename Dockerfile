@@ -1,7 +1,7 @@
 ARG STEAMCMD_VERSION=latest
 ARG AMG_BUILD=latest
 # github-releases:arkmanager/ark-server-tools
-ARG AMG_VERSION=v1.6.68
+ARG AMG_VERSION=v1.6.69
 FROM drpsychick/steamcmd:$STEAMCMD_VERSION AS base
 
 LABEL maintainer="HomeLabHD <homelabhelp@gmail.com>" \
@@ -32,15 +32,34 @@ RUN apt-get update \
     && rm -rf /var/tmp/*
 
 FROM base AS arkmanager-latest
-RUN curl -sL "https://git.io/arkmanager" | bash -s steam
+# -f: fail the build on an HTTP error instead of piping a 404 body into bash.
+# test -x: netinstall.sh's die() does a bare `exit` (== exit 0), so a failed
+# install returns success and installs nothing — verify the binary landed.
+RUN curl -fsSL "https://git.io/arkmanager" | bash -s steam \
+ && test -x /usr/local/bin/arkmanager
 
 FROM base AS arkmanager-versioned
 ARG AMG_VERSION
-RUN curl -sL "https://raw.githubusercontent.com/arkmanager/ark-server-tools/$AMG_VERSION/netinstall.sh" | bash -s steam -- --unstable
+# Install the EXACT pinned tag from its release tarball + install.sh. We do NOT
+# use netinstall.sh here: its only modes are "latest release" or a branch, and
+# with --unstable it silently installs master HEAD — so AMG_VERSION never pinned
+# the tool, only the bootstrapper. This path installs $AMG_VERSION verbatim,
+# stamps arkstTag, and the final grep FAILS THE BUILD if the pin didn't take
+# (no silent master-fallback). -f fails on HTTP errors; test -x catches a no-op.
+RUN cd /tmp \
+ && curl -fsSL "https://github.com/arkmanager/ark-server-tools/archive/refs/tags/${AMG_VERSION}.tar.gz" | tar -xz \
+ && ( cd "ark-server-tools-${AMG_VERSION#v}/tools" \
+      && sed -i "s|^arkstTag='.*'|arkstTag='${AMG_VERSION}'|" arkmanager \
+      && bash install.sh steam ) \
+ && rm -rf "/tmp/ark-server-tools-${AMG_VERSION#v}" \
+ && test -x /usr/local/bin/arkmanager \
+ && grep -q "^arkstTag='${AMG_VERSION}'" /usr/local/bin/arkmanager
 
 ARG AMG_BUILD
 FROM arkmanager-$AMG_BUILD
-RUN ln -s /usr/local/bin/arkmanager /usr/bin/arkmanager
+# Never symlink a target that isn't there (that was the exit-127 crashloop).
+RUN test -x /usr/local/bin/arkmanager \
+ && ln -s /usr/local/bin/arkmanager /usr/bin/arkmanager
 
 COPY arkmanager/arkmanager.cfg /etc/arkmanager/arkmanager.cfg
 COPY arkmanager/instance.cfg /etc/arkmanager/instances/main.cfg

@@ -19,12 +19,25 @@ vars:
   github_org: HomeLabHD
   gitlab_group: PrPlanIT/HomeLabHD
   repo: ark-se-server
+  github_repo: ark-se-server
+
+builds:
+  # hlhd/ark-se-server — ARK: Survival Evolved dedicated server (FROM drpsychick/steamcmd);
+  # arkmanager + RCON health endpoint + cron-based automation. Single docker build.
+  ark-se-server:
+    kind: docker
+    platforms: [linux/amd64]
 
 forges:
   gitlab:
     provider: gitlab
     url: "https://gitlab.prplanit.com"
     credentials: GITLAB
+
+  github:
+    provider: github
+    url: "https://github.com"
+    credentials: GITHUB
 
 repos:
   primary:
@@ -35,10 +48,13 @@ repos:
       default: master
     worktree: "."
 
-builds:
-  ark-se-server:
-    kind: docker
-    platforms: [linux/amd64]
+  github-mirror:
+    forge: github
+    project: "{var:github_org}/{var:github_repo}"
+    roles: [mirror, publish-origin]
+    sync:
+      git: true
+      releases: true
 
 registries:
   dockerhub:
@@ -47,27 +63,41 @@ registries:
     credentials: DOCKER
     default_path: "{var:org}/{var:repo}"
 
+  harbor:
+    provider: harbor
+    url: cr.pcfae.com
+    credentials: HARBOR
+    default_path: "{var:org}/{var:repo}"
+
+  # GitHub Container Registry. On GitHub Actions, StageFreight auto-wires GHCR_USER/
+  # GHCR_TOKEN from the runner's GITHUB_TOKEN (packages: write) — no configured secret.
+  ghcr:
+    provider: ghcr
+    url: ghcr.io
+    credentials: GHCR
+    default_path: "homelabhd/{var:repo}"   # ghcr namespace = github owner, lowercased
+
 publish:
-  # ── Docker Hub: stable releases ─────────────────────────────────
+  # ── Stable releases → all registries ──
   stable:
     kind: registry
-    registry: [dockerhub]
+    registry: [dockerhub, ghcr, harbor]
     build: ark-se-server
-    tags: ["{version}", "latest"]
+    tags: ["v{version}", "latest"]
     when: { git_tags: [stable], events: [tag] }
 
-  # ── Docker Hub: pre-releases ────────────────────────────────────
+  # ── Pre-releases → all registries ──
   prerelease:
     kind: registry
-    registry: [dockerhub]
+    registry: [dockerhub, ghcr, harbor]
     build: ark-se-server
-    tags: ["{version}"]
+    tags: ["v{version}"]
     when: { git_tags: [prerelease], events: [tag] }
 
-  # ── Docker Hub: dev builds on every commit ──────────────────────
+  # ── Dev builds on every commit → all registries (retained/pruned) ──
   dev:
     kind: registry
-    registry: [dockerhub]
+    registry: [dockerhub, ghcr, harbor]
     build: ark-se-server
     tags: ["dev-{sha:8}", "latest-dev"]
     when: { branches: [main], events: [push] }
@@ -75,36 +105,71 @@ publish:
       keep_last: 6
       protect: ["latest-dev"]
 
-  # ── Docker Hub: project metadata / README sync ──────────────────
+  # ── Project metadata: registry overviews + forge repos ──
   project-metadata:
     kind: metadata
-    registry: [dockerhub]
+    registry: [dockerhub, harbor]
+    repos: [primary, github-mirror]
     readme: README.md
     description:
-      - "ARK: Survival Evolved dedicated server with arkmanager, RCON health endpoint, and cron-based automation."
+      - "A container image for an ARK: Survival Evolved dedicated server — drpsychick/steamcmd base with arkmanager, an RCON health endpoint, and cron-based automation."
+    topics: [ark, ark-survival-evolved, game-server, steamcmd, arkmanager, docker]
     when: { branches: [main], events: [push, tag] }
 
-  # ── Primary release (GitLab) ────────────────────────────────────
-  primary-release:
+  # ── Release (gitlab primary; projects to github via github-mirror sync.releases) ──
+  release:
     kind: release
     type: latest
     repos: [primary]
-    aliases: ["{version}", "latest"]
+    aliases: ["v{version}", "latest"]
     when: { git_tags: [stable], events: [tag] }
+
+build_cache:
+  mode: hybrid
+  external:
+    registry: harbor
+    path: "cache"
+    fallback: "main"
+  local:
+    retention:
+      max_age: "7d"
+      max_size: "8GB"
+
+manifest:
+  enabled: true
+  mode: workspace
 
 commit:
   default_type: docs
   conventional: true
   backend: git
 
+dependency:
+  enabled: true
+  output: ".stagefreight/deps"
+  scope:
+    dockerfile_env: true
+  commit:
+    enabled: true
+    type: chore
+    message: "update managed dependencies"
+    push: true
+    skip_ci: false
+
 lint:
   level: full
+  exclude:
+    - "*.png"
+    - "*.svg"
+    - "*.ico"
   modules:
     freshness:
       enabled: true
       cache_ttl: 300
       sources:
         docker_images: true
+      vulnerability:
+        enabled: true
     tabs:
       enabled: true
     secrets:
@@ -113,72 +178,85 @@ lint:
       enabled: true
     filesize:
       enabled: true
+    unicode:
+      enabled: true
+      detect_bidi: true
+      detect_zero_width: true
+      detect_control_ascii: true
+
+release:
+  enabled: true
+  security_summary: true
+  registry_links: true
 
 security:
   enabled: true
+  output: ".stagefreight/security"
   sbom: true
   release_detail: full
 
+toolchains:
+  trivy: "0.69.3"
+  syft: "1.42.3"
+  grype: "0.110.0"
+  osv-scanner: "2.3.5"
+  cosign: "3.0.6"
+
 # stencils: define each renderable once (id → stencil def). Inline defs render a
-# badge (default, SVG via output:) or a shield (render: shield); named producers
-# render via type. Shared by scribe.
+# badge (default) or a shield (render: shield); named producers render via type.
 stencils:
-  # ── generated badges (SVG output) ──
-  build:           { label: build,      message: "{env:BUILD_STATUS}", color: auto, font: monofur, output: ".stagefreight/badges/build.svg", link: "https://gitlab.prplanit.com/{var:gitlab_group}/{var:repo}/-/pipelines" }
-  license:         { label: license,    message: "MIT", color: "#310937", font: monofur, output: ".stagefreight/badges/license.svg", link: "https://github.com/{var:github_org}/{var:repo}/blob/master/LICENSE" }
-  release:         { label: release,    message: "v{base}", color: "#74ecbe", font: dejavu-sans, font_size: 11, output: ".stagefreight/badges/release.svg", link: "https://github.com/{var:github_org}/{var:repo}/releases" }
-  updated:         { label: updated,    message: "{env:BUILD_DATE}", color: "#236144", font: dejavu-sans, font_size: 11, output: ".stagefreight/badges/updated.svg" }
-  pulls:           { label: pulls,      message: "{docker.pulls}", color: "#1d63ed", output: ".stagefreight/badges/pulls.svg", link: "https://hub.docker.com/r/{var:org}/{var:repo}" }
-  latest:          { label: latest,     message: "v{base}", color: "#74ecbe", output: ".stagefreight/badges/latest.svg", link: "https://hub.docker.com/r/{var:org}/{var:repo}/tags?name=latest" }
-  release-updated: { label: updated,    message: "{docker.tag.v{base}.updated}", color: "#236144", output: ".stagefreight/badges/release-updated.svg" }
-  release-size:    { label: size,       message: "{docker.tag.v{base}.size}", color: "#555", output: ".stagefreight/badges/release-size.svg", link: "https://hub.docker.com/r/{var:org}/{var:repo}/tags?name=v{base}" }
-  latest-dev:      { label: latest-dev, message: "dev-{sha:8}", color: "#3b82f6", output: ".stagefreight/badges/latest-dev.svg", link: "https://hub.docker.com/r/{var:org}/{var:repo}/tags?name=latest-dev" }
-  dev-updated:     { label: updated,    message: "{docker.tag.latest-dev.updated}", color: "#236144", output: ".stagefreight/badges/dev-updated.svg" }
-  dev-size:        { label: size,       message: "{docker.tag.latest-dev.size}", color: "#555", output: ".stagefreight/badges/dev-size.svg", link: "https://hub.docker.com/r/{var:org}/{var:repo}/tags?name=latest-dev" }
+  # ── generated badges ──
+  build:   { label: build,   message: "{env:BUILD_STATUS}", color: auto, font: monofur, link: "https://gitlab.prplanit.com/{var:gitlab_group}/{var:repo}/-/pipelines" }
+  license: { label: license, message: "MIT", color: "#310937", font: monofur, link: LICENSE }
+  release: { label: release, message: "v{base}", color: "#74ecbe", font: dejavu-sans, font_size: 11, link: "https://github.com/{var:github_org}/{var:github_repo}/releases" }
+  updated: { label: updated, message: "{env:BUILD_DATE}", color: "#236144", font: dejavu-sans, font_size: 11 }
+  pulls:   { label: pulls,   message: "{docker.pulls}", color: "#1d63ed", link: "https://hub.docker.com/r/{var:org}/{var:repo}" }
 
   # ── inline shields ──
-  donate:   { render: shield, message: donate,  color: "#FF5E5B", logo: ko-fi,          logo_color: white, link: "https://ko-fi.com/T6T41IT163" }
-  sponsor:  { render: shield, message: sponsor, color: "#EA4AAA", logo: githubsponsors, logo_color: white, link: "https://github.com/sponsors/{var:github_org}" }
-  github:   { render: shield, label: GitHub, message: source, color: "#181717", logo: github, link: "https://github.com/{var:github_org}/{var:repo}" }
-  gitlab:   { render: shield, label: GitLab, message: source, color: "#FC6D26", logo: gitlab, link: "https://gitlab.prplanit.com/{var:gitlab_group}/{var:repo}" }
-  docker:   { render: shield, label: Docker, message: "{var:org}/{var:repo}", color: "#2496ED", logo: docker, logo_color: white, link: "https://hub.docker.com/r/{var:org}/{var:repo}" }
-  prs-open: { render: shield, shield: "github/issues-pr/{var:github_org}/{var:repo}" }
+  donate:  { render: shield, message: donate,  color: "#FF5E5B", logo: ko-fi,          logo_color: white, link: "https://ko-fi.com/T6T41IT163" }
+  sponsor: { render: shield, message: sponsor, color: "#EA4AAA", logo: githubsponsors, logo_color: white, link: "https://github.com/sponsors/{var:github_org}" }
+  github:  { render: shield, label: GitHub, message: source, color: "#181717", logo: github, link: "https://github.com/{var:github_org}/{var:github_repo}" }
+  gitlab:  { render: shield, label: GitLab, message: source, color: "#FC6D26", logo: gitlab, link: "https://gitlab.prplanit.com/{var:gitlab_group}/{var:repo}" }
+  docker:  { render: shield, label: Docker, message: "{var:org}/{var:repo}", color: "#2496ED", logo: docker, logo_color: white, link: "https://hub.docker.com/r/{var:org}/{var:repo}" }
 
-  # ── named producers ──
-  last-commit:  { type: github-last-commit,  params: { repo: "{var:github_org}/{var:repo}" } }
-  issues-open:  { type: github-issues-open,  params: { repo: "{var:github_org}/{var:repo}" } }
-  contributors: { type: github-contributors, params: { repo: "{var:github_org}/{var:repo}" } }
+  # ── named producers (repo resolves from repos: publish-origin) ──
+  last-commit:  { type: github-last-commit }
+  issues-open:  { type: github-issues-open }
+  prs-open:     { type: github-prs-open }
+  contributors: { type: github-contributors }
+
+  # ── build-contents (rendered from the build's manifest inventory) ──
+  contents-base: { type: contents, build: ark-se-server, section: inventories.versions, render: badges }
 
 scribe:
-  # files: one placement region per marked span; items are stencil name-refs
-  # ("br" inserts a line break).
   files:
     readme.badges:
       file: "README.md"
-      link_base: "https://github.com/{var:github_org}/{var:repo}/blob/master"
       between: ["<!-- sf:badges:start -->", "<!-- sf:badges:end -->"]
       inline: true
       items: [build, license, release, updated, donate, sponsor]
 
     readme.project:
       file: "README.md"
-      link_base: "https://github.com/{var:github_org}/{var:repo}/blob/master"
       between: ["<!-- sf:project:start -->", "<!-- sf:project:end -->"]
       inline: true
       items: [github, gitlab, last-commit, issues-open, prs-open, contributors]
 
     readme.image:
       file: "README.md"
-      link_base: "https://github.com/{var:github_org}/{var:repo}/blob/master"
       between: ["<!-- sf:image:start -->", "<!-- sf:image:end -->"]
-      items: [docker, pulls, br, latest, release-updated, release-size, latest-dev, dev-updated, dev-size]
+      items: [docker, pulls]
+
+    readme.contents.base:
+      file: "README.md"
+      between: ["<!-- sf:contents-base:start -->", "<!-- sf:contents-base:end -->"]
+      items: [contents-base]
 
   commit:
     type: docs
     message: "refresh generated docs and badges"
     add:
       - "README.md"
-      - ".stagefreight/badges"
       - ".stagefreight/scribe"
     push: true
     skip_ci: true

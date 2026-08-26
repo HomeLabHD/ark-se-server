@@ -10,7 +10,7 @@ aliases:
       default: latest
       type: string
     amg_version:
-      default: v1.6.68 # github-releases:arkmanager/ark-server-tools
+      default: v1.6.69 # github-releases:arkmanager/ark-server-tools
       type: string
     repo:
       default: drpsychick
@@ -64,7 +64,7 @@ workflows:
             parameters:
               steamcmd_version: ["latest"]
               amg_build: ["versioned"]
-              amg_version: ["master", "v1.6.62"]
+              amg_version: ["master", "v1.6.69"]
 
   # build tags weekly
   weekly:
@@ -86,4 +86,4 @@ workflows:
             parameters:
               steamcmd_version: ["latest"]
               amg_build: ["versioned"]
-              amg_version: ["master", "v1.6.62"]
+              amg_version: ["master", "v1.6.69"]

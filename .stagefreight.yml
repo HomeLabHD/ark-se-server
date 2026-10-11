@@ -8,12 +8,6 @@
 # ------------------------------------------------------------------------------
 
 version: 1
-vars:
-  github_org: HomeLabHD
-  github_repo: ark-se-server
-  gitlab_group: PrPlanIT/HomeLabHD
-  org: hlhd
-  repo: ark-se-server
 builds:
   preset: https://gitlab.prplanit.com/PrPlanIT/MaintenancePolicy//preset/build-docker.yml
 scribe:

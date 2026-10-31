@@ -17,7 +17,7 @@ ARK: Survival Evolved dedicated server image, for single instances and clusters.
 
 ### Features
 * Automated install (pull the image and run, no additional commands necessary)
-* A fork of [SickHub/arkserver](https://github.com/SickHub/arkserver), built on [drpsychick/steamcmd](https://github.com/drpsychick/steamcmd) with the latest `steamcmd`
+* A fork of [SickHub/arkserver](https://github.com/SickHub/arkserver), built on [HomeLabHD/SteamCMD](https://github.com/HomeLabHD/SteamCMD) (Debian slim) with the latest `steamcmd`
 * Configuration via Environment Variables
 * Easy crontab manipulation for automated backups, updates, daily restarts, weekly dino wipes, etc
 * Simple volume structure for server files, config, logs, backups, etc

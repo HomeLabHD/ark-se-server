@@ -1,8 +1,8 @@
-ARG STEAMCMD_VERSION=latest
+ARG STEAMCMD_VERSION=v13.7.0
 ARG AMG_BUILD=latest
 # github-releases:arkmanager/ark-server-tools
 ARG AMG_VERSION=v1.6.69
-FROM drpsychick/steamcmd:$STEAMCMD_VERSION AS base
+FROM hlhd/steamcmd:$STEAMCMD_VERSION AS base
 
 LABEL maintainer="HomeLabHD <homelabhelp@gmail.com>" \
     org.opencontainers.image.title="ark-se-server" \
@@ -16,7 +16,7 @@ LABEL maintainer="HomeLabHD <homelabhelp@gmail.com>" \
 USER root
 
 RUN apt-get update \
-    && apt-get install -y \
+    && apt-get install -y --no-install-recommends \
     curl \
     cron \
     bzip2 \

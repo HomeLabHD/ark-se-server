@@ -21,6 +21,7 @@ RUN apt-get update \
     cron \
     bzip2 \
     perl-modules \
+    python3 \
     lsof \
     libc6-i386 \
 #    libsdl2-2.0.0:i386 \

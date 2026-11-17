@@ -1,5 +1,5 @@
 ARG STEAMCMD_VERSION=v13.7.0
-ARG AMG_BUILD=latest
+ARG AMG_BUILD=versioned
 # github-releases:arkmanager/ark-server-tools
 ARG AMG_VERSION=v1.6.69
 FROM hlhd/steamcmd:$STEAMCMD_VERSION AS base

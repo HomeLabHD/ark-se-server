@@ -78,6 +78,8 @@ repos:
     roles:
       - primary
     worktree: .
+schedules:
+  preset: https://git.optcp.com/PrPlanIT/MaintenancePolicy//preset/schedules-upstream.yml
 stencils:
   presets:
     - https://git.optcp.com/PrPlanIT/MaintenancePolicy//preset/stencils-base.yml
@@ -88,3 +90,18 @@ toolchains:
   want:
     presets:
       - https://git.optcp.com/PrPlanIT/MaintenancePolicy//preset/toolchains-scanners.yml
+upstream:
+  evidence:
+    image:
+      probe:
+        file: /usr/local/bin/arkmanager
+        match: arkstTag='v?(?P<version>[0-9.]+)'
+  sources:
+    arkmanager:
+      git: https://github.com/arkmanager/ark-server-tools
+      pins:
+        - arg: AMG_VERSION
+          file: Dockerfile
+  version:
+    since: v1.6.69
+    track: arkmanager

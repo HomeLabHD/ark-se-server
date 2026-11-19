@@ -39,7 +39,6 @@ metadata:
   description:
     - 'Dedicated server image for ARK: Survival Evolved, for single instances and clusters.'
     - 'Container image running an ARK: Survival Evolved dedicated server, supporting both standalone instances and multi-server clusters, built on the SteamCMD base image.'
-  license: MIT
   org: HomeLabHD
   title: 'ARK: Survival Evolved Server'
   topics:
@@ -95,12 +94,5 @@ upstream:
     image:
       file: /usr/local/bin/arkmanager
       match: arkstTag='v?(?P<version>[0-9.]+)'
-  sources:
-    arkmanager:
-      git: https://github.com/arkmanager/ark-server-tools
-      pins:
-        - arg: AMG_VERSION
-          file: Dockerfile
   version:
-    since: v1.6.69
-    track: arkmanager
+    track: ark-server-tools
